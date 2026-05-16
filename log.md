@@ -1,5 +1,11 @@
 # ideaq Log
 
+## 2026-05-16 local venv docs
+
+Created a local ignored `.venv` for the web dashboard and documented the venv-based run/test commands.
+Up next:
+- keep runtime dependencies out of git while making local startup explicit
+
 ## 2026-05-16 project split
 
 Created the standalone `ideaq` project from the web dashboard and iOS app code.

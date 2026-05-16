@@ -6,9 +6,31 @@ This repository contains the web dashboard and iOS app code only. It does not co
 
 ## Web
 
+One-time local setup:
+
 ```sh
-cd /Users/odile/projects/ideaq/web
-uv run app.py --data-root /path/to/idea-data
+cd /Users/odile/projects/ideaq
+python3 -m venv .venv
+.venv/bin/python -m pip install flask
+```
+
+Run the dashboard against a separate data checkout:
+
+```sh
+cd /Users/odile/projects/ideaq
+.venv/bin/python web/app.py --data-root /path/to/idea-data
+```
+
+For the current local data repo, use:
+
+```sh
+.venv/bin/python web/app.py --data-root /Users/odile/projects/meta
+```
+
+Run web tests:
+
+```sh
+.venv/bin/python -m unittest discover -s web/tests -t .
 ```
 
 ## iOS
