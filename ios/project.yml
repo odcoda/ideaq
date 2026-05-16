@@ -1,0 +1,46 @@
+name: IdeaQueue
+options:
+  deploymentTarget:
+    iOS: "17.0"
+  xcodeVersion: "15.4"
+  projectFormat: xcode15_3
+settings:
+  base:
+    ALWAYS_SEARCH_USER_PATHS: NO
+    SWIFT_VERSION: 5.10
+targets:
+  IdeaQueue:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: IdeaQueue
+    info:
+      path: IdeaQueue/Info.plist
+      properties:
+        CFBundleDisplayName: IdeaQueue
+        LSApplicationCategoryType: public.app-category.productivity
+        UILaunchScreen: {}
+        UIApplicationSupportsIndirectInputEvents: true
+    settings:
+      base:
+        ENABLE_TESTABILITY: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.odcoda.ideaq.ideaqueue
+        PRODUCT_NAME: IdeaQueue
+        TARGETED_DEVICE_FAMILY: "1,2"
+    scheme:
+      testTargets:
+        - IdeaQueueTests
+  IdeaQueueTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: IdeaQueueTests
+    dependencies:
+      - target: IdeaQueue
+    settings:
+      base:
+        BUNDLE_LOADER: $(TEST_HOST)
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_NAME: IdeaQueueTests

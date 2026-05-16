@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Idea Queue</title>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
+<style>
+:root { --bg:#f8f8f8; --fg:#111; --border:#ccc; --hi:#e0e7ff; --hdr:#ddd; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font:13px/1.4 "SF Mono","Consolas",monospace; background:var(--bg); color:var(--fg); padding:12px 20px; }
+h1 { font-size:15px; margin-bottom:10px; }
+.project { margin-bottom:24px; }
+.project-header { display:flex; align-items:center; gap:8px; margin-bottom:4px; }
+.project-header h2 { font-size:14px; cursor:pointer; user-select:none; }
+.project-header h2:hover { text-decoration:underline; }
+.btn { font:inherit; font-size:12px; cursor:pointer; border:1px solid var(--border); background:#fff; padding:1px 7px; border-radius:3px; }
+.btn:hover { background:var(--hi); }
+.btn-push { background:#e0ffe0; border-color:#6b6; }
+.btn-push:hover { background:#c0f0c0; }
+table { width:100%; border-collapse:collapse; table-layout:fixed; }
+th,td { border:1px solid var(--border); padding:3px 5px; vertical-align:top; text-align:left; overflow:hidden; }
+th { background:var(--hdr); font-weight:600; font-size:12px; white-space:nowrap; }
+/* column widths */
+col.c-ctrl { width:28px; }
+col.c-name { width:11%; }
+col.c-human { width:30%; }
+col.c-desc { width:auto; }
+col.c-diff { width:48px; }
+col.c-related { width:13%; }
+col.c-pri { width:72px; }
+td.ctrl-cell { text-align:center; color:#999; user-select:none; padding:0; vertical-align:middle; }
+.ctrl-inner { display:flex; flex-direction:column; align-items:center; gap:1px; }
+.ctrl-icon { cursor:pointer; font-size:13px; line-height:1.2; width:100%; }
+.ctrl-icon:hover { color:var(--fg); }
+.ctrl-icon.drag-handle { cursor:grab; }
+.ctrl-icon.complete-btn:hover { color:#16a34a; }
+.ctrl-icon.delete-btn:hover { color:#dc2626; }
+td[contenteditable="true"] { cursor:text; }
+td[contenteditable="true"]:focus { outline:2px solid #6b8afd; background:#fff; }
+select.pri { font:inherit; font-size:12px; border:none; background:transparent; width:100%; }
+tr.sortable-ghost { opacity:0.4; }
+tr.sortable-chosen { background:var(--hi); }
+/* row shading by priority */
+tr.row-high { background:#ede9fe; }
+tr.row-medium { background:#e0f2fe; }
+tr.row-low { background:#fef9c3; }
+tr.row-none { background:transparent; }
+/* priority text colors */
+.pri-high { color:#7c3aed; font-weight:600; }
+.pri-medium { color:#0284c7; }
+.pri-low { color:#a16207; }
+.pri-none { color:#888; }
+#toolbar { margin-bottom:12px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+#toolbar label { font-size:12px; margin-left:8px; }
+#toolbar input[type="checkbox"] { margin-right:2px; }
+/* project order list */
+#project-order { list-style:none; display:flex; flex-wrap:wrap; gap:4px; margin-bottom:14px; padding:0; }
+#project-order li { font-size:12px; padding:2px 8px; border:1px solid var(--border); border-radius:3px; background:#fff; cursor:grab; user-select:none; }
+#project-order li:hover { background:var(--hi); }
+#project-order li.sortable-ghost { opacity:0.4; }
+.collapsed table { display:none; }
+.collapse-arrow { display:inline-block; width:14px; font-size:11px; }
+/* context menu */
+#ctx-menu { position:absolute; display:none; background:#fff; border:1px solid var(--border); border-radius:4px; box-shadow:2px 4px 12px rgba(0,0,0,.15); padding:4px 0; z-index:100; min-width:120px; }
+#ctx-menu div { padding:3px 12px; font-size:12px; cursor:pointer; }
+#ctx-menu div:hover { background:var(--hi); }
+#ctx-menu div.ctx-current { color:#999; cursor:default; }
+#ctx-menu div.ctx-current:hover { background:transparent; }
+/* undo toast */
+#undo-toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#333; color:#fff; padding:8px 16px; border-radius:6px; font-size:12px; display:none; z-index:200; }
+#undo-toast a { color:#8bf; cursor:pointer; margin-left:8px; text-decoration:underline; }
+/* push status */
+#push-status { font-size:12px; margin-left:4px; }
+</style>
+</head>
+<body>
+<h1>Idea Queue</h1>
+<div id="toolbar">
+  <button class="btn btn-push" onclick="gitCommitPush()">commit &amp; push</button>
+  <span id="push-status"></span>
+  <button class="btn" onclick="addProject()">+ project</button>
+  <button class="btn" onclick="sortAllByPriority()">sort all by priority</button>
+  <button class="btn" onclick="collapseAll()">collapse all</button>
+  <button class="btn" onclick="expandAll()">expand all</button>
+  <span style="margin-left:12px;font-size:12px;">filter:</span>
+  <label><input type="checkbox" checked onchange="toggleFilter('high')"> high</label>
+  <label><input type="checkbox" checked onchange="toggleFilter('medium')"> medium</label>
+  <label><input type="checkbox" checked onchange="toggleFilter('low')"> low</label>
+  <label><input type="checkbox" checked onchange="toggleFilter('none')"> none</label>
+</div>
+<ul id="project-order"></ul>
+<div id="ctx-menu"></div>
+<div id="undo-toast"><span id="undo-msg"></span><a onclick="undoDelete()">undo</a></div>
+<div id="app"></div>
+
+<script>
+const PRIO_ORDER = {high:0,medium:1,low:2,none:3};
+let STATE = {{ projects | tojson }};
+let PROJECT_ORDER = {{ project_order | tojson }};
+let FILTERS = {high:true, medium:true, low:true, none:true};
+let COLLAPSED = {};
+let UNDO_STACK = [];
+let UNDO_TIMER = null;
+
+function api(url, body) {
+  return fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+}
+
+function toggleFilter(pri) {
+  FILTERS[pri] = !FILTERS[pri];
+  render();
+}
+
+function collapseAll() {
+  for (const p of PROJECT_ORDER) COLLAPSED[p] = true;
+  render();
+}
+
+function expandAll() {
+  COLLAPSED = {};
+  render();
+}
+
+function toggleCollapse(proj) {
+  COLLAPSED[proj] = !COLLAPSED[proj];
+  render();
+}
+
+function gitCommitPush() {
+  const st = document.getElementById('push-status');
+  st.textContent = 'pushing...';
+  st.style.color = '#666';
+  api('/api/git_commit_push', {}).then(r=>r.json()).then(d => {
+    st.textContent = d.message || d.error || 'done';
+    st.style.color = d.ok ? '#16a34a' : '#dc2626';
+    setTimeout(() => { st.textContent = ''; }, 4000);
+  }).catch(() => {
+    st.textContent = 'error';
+    st.style.color = '#dc2626';
+  });
+}
+
+function renderProjectOrder() {
+  const ul = document.getElementById('project-order');
+  ul.innerHTML = PROJECT_ORDER.map(p => `<li data-proj="${esc(p)}">${esc(p)} <span style="color:#999;font-size:11px">(${(STATE[p]||[]).length})</span></li>`).join('');
+  new Sortable(ul, {
+    animation: 120,
+    ghostClass: 'sortable-ghost',
+    onEnd: function() {
+      PROJECT_ORDER = Array.from(ul.children).map(li => li.dataset.proj);
+      api('/api/project_order', PROJECT_ORDER);
+      render();
+    }
+  });
+}
+
+function render() {
+  renderProjectOrder();
+  const app = document.getElementById('app');
+  app.innerHTML = '';
+  for (const proj of PROJECT_ORDER) {
+    const ideas = STATE[proj] || [];
+    const filtered = ideas.map((idea, i) => ({idea, i})).filter(({idea}) => FILTERS[idea.priority||'none']);
+    const isCollapsed = COLLAPSED[proj];
+    const arrow = isCollapsed ? '\u25b6' : '\u25bc';
+    const div = document.createElement('div');
+    div.className = 'project' + (isCollapsed ? ' collapsed' : '');
+    div.innerHTML = `
+      <div class="project-header">
+        <h2 onclick="toggleCollapse('${esc(proj)}')"><span class="collapse-arrow">${arrow}</span> ${esc(proj)} <span style="color:#999;font-weight:normal;font-size:12px">(${filtered.length}/${ideas.length})</span></h2>
+        <button class="btn" onclick="addIdea('${esc(proj)}')">+ idea</button>
+        <button class="btn" onclick="sortByPriority('${esc(proj)}')">sort</button>
+      </div>
+      <table>
+        <colgroup>
+          <col class="c-ctrl"><col class="c-name"><col class="c-human">
+          <col class="c-desc"><col class="c-diff"><col class="c-related"><col class="c-pri">
+        </colgroup>
+        <thead><tr>
+          <th></th><th>name</th><th>human_idea</th><th>description</th>
+          <th>diff</th><th>related</th><th>priority</th>
+        </tr></thead>
+        <tbody id="tb-${esc(proj)}">
+        ${filtered.map(({idea, i}) => ideaRow(proj, idea, i)).join('')}
+        </tbody>
+      </table>`;
+    app.appendChild(div);
+    if (!isCollapsed) initSortable(proj);
+  }
+}
+
+function ideaRow(proj, idea, i) {
+  const rel = (idea.related||[]).join(', ');
+  const pri = idea.priority||'none';
+  const pc = 'pri-'+pri;
+  const rc = 'row-'+pri;
+  return `<tr class="${rc}" data-proj="${esc(proj)}" data-idx="${i}">
+    <td class="ctrl-cell"><div class="ctrl-inner">
+      <span class="ctrl-icon drag-handle" oncontextmenu="showCtxMenu(event,'${esc(proj)}',${i})">&#x2630;</span>
+      <span class="ctrl-icon complete-btn" title="Mark complete" onclick="completeIdea('${esc(proj)}',${i})">&#x2713;</span>
+      <span class="ctrl-icon delete-btn" title="Delete" onclick="deleteIdea('${esc(proj)}',${i})">&#x2717;</span>
+    </div></td>
+    <td contenteditable="true" data-field="name" onblur="onEdit(this)">${esc(idea.name||'')}</td>
+    <td contenteditable="true" data-field="human_idea" onblur="onEdit(this)">${esc(idea.human_idea||'')}</td>
+    <td contenteditable="true" data-field="description" onblur="onEdit(this)">${esc(idea.description||'')}</td>
+    <td contenteditable="true" data-field="difficulty" onblur="onEdit(this)">${esc(idea.difficulty||'')}</td>
+    <td contenteditable="true" data-field="related" onblur="onEditRelated(this)">${esc(rel)}</td>
+    <td class="${pc}"><select class="pri ${pc}" onchange="onPriority(this,'${esc(proj)}',${i})">
+      ${['none','low','medium','high'].map(p=>`<option${p===pri?' selected':''}>${p}</option>`).join('')}
+    </select></td>
+  </tr>`;
+}
+
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+
+function onEdit(td) {
+  const tr = td.parentElement;
+  const proj = tr.dataset.proj;
+  const idx = parseInt(tr.dataset.idx);
+  const field = td.dataset.field;
+  const value = td.innerText.trim();
+  const old_value = STATE[proj][idx][field];
+  if (value === old_value) return;
+  STATE[proj][idx][field] = value;
+  api('/api/update_idea', {project:proj, index:idx, field, value, old_value});
+}
+
+function onEditRelated(td) {
+  const tr = td.parentElement;
+  const proj = tr.dataset.proj;
+  const idx = parseInt(tr.dataset.idx);
+  const value = td.innerText.trim().split(/\s*,\s*/).filter(Boolean);
+  STATE[proj][idx].related = value;
+  api('/api/update_idea', {project:proj, index:idx, field:'related', value});
+}
+
+function onPriority(sel, proj, idx) {
+  const value = sel.value;
+  STATE[proj][idx].priority = value;
+  sel.className = 'pri pri-'+value;
+  sel.parentElement.className = 'pri-'+value;
+  const tr = sel.closest('tr');
+  tr.className = 'row-'+value;
+  api('/api/update_idea', {project:proj, index:idx, field:'priority', value});
+}
+
+function sortByPriority(proj) {
+  STATE[proj].sort((a,b) => (PRIO_ORDER[a.priority||'none']??3) - (PRIO_ORDER[b.priority||'none']??3));
+  api('/api/save', {[proj]: STATE[proj]});
+  render();
+}
+
+function sortAllByPriority() {
+  for (const proj of Object.keys(STATE)) {
+    STATE[proj].sort((a,b) => (PRIO_ORDER[a.priority||'none']??3) - (PRIO_ORDER[b.priority||'none']??3));
+  }
+  api('/api/save', STATE);
+  render();
+}
+
+function addIdea(proj) {
+  STATE[proj].push({name:'new_idea',human_idea:'',description:'',difficulty:'S',related:[],priority:'none'});
+  api('/api/new_idea', {project:proj});
+  COLLAPSED[proj] = false;
+  render();
+}
+
+function addProject() {
+  const name = prompt('Project name:');
+  if (!name || !name.trim()) return;
+  const n = name.trim().replace(/[^a-z0-9_-]/gi,'_').toLowerCase();
+  if (STATE[n]) { alert('Already exists'); return; }
+  STATE[n] = [];
+  PROJECT_ORDER.push(n);
+  api('/api/new_project', {name:n});
+  api('/api/project_order', PROJECT_ORDER);
+  render();
+}
+
+function completeIdea(proj, idx) {
+  const idea = STATE[proj].splice(idx, 1)[0];
+  api('/api/complete_idea', {project:proj, index:idx});
+  render();
+}
+
+function deleteIdea(proj, idx) {
+  const idea = STATE[proj].splice(idx, 1)[0];
+  // don't call API yet — allow undo
+  UNDO_STACK.push({proj, idx, idea});
+  showUndoToast(`Deleted "${idea.name}"`);
+  render();
+}
+
+function showUndoToast(msg) {
+  const toast = document.getElementById('undo-toast');
+  document.getElementById('undo-msg').textContent = msg;
+  toast.style.display = 'block';
+  clearTimeout(UNDO_TIMER);
+  UNDO_TIMER = setTimeout(() => {
+    // flush all pending deletes
+    flushDeletes();
+    toast.style.display = 'none';
+  }, 6000);
+}
+
+function flushDeletes() {
+  while (UNDO_STACK.length) {
+    const {proj, idx} = UNDO_STACK.shift();
+    // STATE already has the item removed; just persist
+    api('/api/delete_idea', {project:proj, index:idx});
+  }
+}
+
+function undoDelete() {
+  clearTimeout(UNDO_TIMER);
+  if (!UNDO_STACK.length) return;
+  const {proj, idx, idea} = UNDO_STACK.pop();
+  STATE[proj].splice(idx, 0, idea);
+  // if more pending, keep toast; otherwise hide
+  if (UNDO_STACK.length) {
+    const prev = UNDO_STACK[UNDO_STACK.length-1];
+    showUndoToast(`Deleted "${prev.idea.name}"`);
+  } else {
+    document.getElementById('undo-toast').style.display = 'none';
+  }
+  // persist the restored state
+  api('/api/save', {[proj]: STATE[proj]});
+  render();
+}
+
+function initSortable(proj) {
+  const tb = document.getElementById('tb-'+proj);
+  if (!tb) return;
+  new Sortable(tb, {
+    group: 'ideas',
+    handle: '.drag-handle',
+    animation: 120,
+    ghostClass: 'sortable-ghost',
+    chosenClass: 'sortable-chosen',
+    onEnd: function(evt) {
+      const fromProj = evt.from.id.replace('tb-','');
+      const toProj = evt.to.id.replace('tb-','');
+      const fi = parseInt(evt.item.dataset.idx);
+      const ti = evt.newIndex;
+      const idea = STATE[fromProj].splice(fi, 1)[0];
+      if (!STATE[toProj]) STATE[toProj] = [];
+      STATE[toProj].splice(ti, 0, idea);
+      api('/api/move_idea', {from_project:fromProj, from_index:fi, to_project:toProj, to_index:ti}).then(()=>{
+        render();
+      });
+    }
+  });
+}
+
+function showCtxMenu(e, proj, idx) {
+  e.preventDefault();
+  const menu = document.getElementById('ctx-menu');
+  menu.innerHTML = PROJECT_ORDER.map(p =>
+    p === proj
+      ? `<div class="ctx-current">${esc(p)} (current)</div>`
+      : `<div onclick="moveToProject('${esc(proj)}',${idx},'${esc(p)}')">${esc(p)}</div>`
+  ).join('');
+  menu.style.left = e.pageX + 'px';
+  menu.style.top = e.pageY + 'px';
+  menu.style.display = 'block';
+}
+
+function moveToProject(fromProj, idx, toProj) {
+  hideCtxMenu();
+  const idea = STATE[fromProj].splice(idx, 1)[0];
+  if (!STATE[toProj]) STATE[toProj] = [];
+  STATE[toProj].push(idea);
+  const ti = STATE[toProj].length - 1;
+  api('/api/move_idea', {from_project:fromProj, from_index:idx, to_project:toProj, to_index:ti});
+  render();
+}
+
+function hideCtxMenu() {
+  document.getElementById('ctx-menu').style.display = 'none';
+}
+
+document.addEventListener('click', hideCtxMenu);
+
+render();
+</script>
+</body>
+</html>

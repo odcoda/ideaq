@@ -1,0 +1,17 @@
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+web/venv/
+
+# Xcode user/local state
+DerivedData/
+build/
+*.xcuserstate
+xcuserdata/
+ios/IdeaQueue.xcodeproj/project.xcworkspace/xcuserdata/
+ios/IdeaQueue.xcodeproj/project.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist
