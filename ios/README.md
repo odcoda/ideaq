@@ -13,9 +13,9 @@ Offline-first SwiftUI port of the `web/` dashboard.
 
 The app does not depend on git for data sync. It keeps local JSON files as the offline source of truth, and sync is best-effort when a server is configured.
 
-- `Sync now` fetches the server snapshot, merges it with local JSON and the last synced base snapshot, then uploads the merged snapshot if local changes need to be published
+- `Sync now` fetches the server snapshot, uploads local JSON plus the last synced base snapshot when local changes need to be published, then accepts the server's canonical merged snapshot
 - if the server URL is blank or the request fails, local editing still works
-- the sync layer uses file-level three-way conflict detection based on the last synced base snapshot
+- server-side merge handles conflicts based on the last synced base snapshot
 
 The expected server contract is intentionally small:
 
@@ -43,11 +43,14 @@ PUT /v1/stores/{storeID}/snapshot
   "files": {
     "queue/PROJECTS.json": "[\"ksink\"]\n",
     "queue/ksink.json": "[]\n"
+  },
+  "client_base_files": {
+    "queue/PROJECTS.json": "[]\n"
   }
 }
 ```
 
-`PUT` should return the same shape as `GET`, with the new revision and canonical files. If the server needs auth, the app sends the optional token as `Authorization: Bearer <token>`.
+`client_base_files` lets the server do a proper three-way merge. `PUT` should return the same shape as `GET`, with the new revision and canonical files. If the server needs auth, the app sends the optional token as `Authorization: Bearer <token>`.
 
 ## Setup
 
@@ -55,7 +58,7 @@ PUT /v1/stores/{storeID}/snapshot
 2. Pick an iPhone simulator or device.
 3. Run the `IdeaQueue` scheme.
 
-Server sync is optional. Configure the server URL, store ID, and optional bearer token in the sync sheet when the backend exists.
+Server sync is optional. Configure the server URL, store ID, and optional bearer token in the sync sheet.
 
 ## Regenerating the project
 

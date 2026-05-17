@@ -2,19 +2,19 @@ import XCTest
 @testable import IdeaQueue
 
 final class ServerSyncPlannerTests: XCTestCase {
-    func testSyncPreservesLocalChangesWhenServerIsUnchanged() throws {
+    func testSyncUploadsLocalChangesWhenServerIsUnchanged() {
         let local = ["queue/alpha.json": "local"]
         let base = ["queue/alpha.json": "base"]
         let server = ["queue/alpha.json": "base"]
 
-        let plan = try ServerSyncPlanner.makePlan(local: local, base: base, server: server)
+        let plan = ServerSyncPlanner.makePlan(local: local, base: base, server: server)
 
-        XCTAssertEqual(plan.mergedFiles["queue/alpha.json"], "local")
+        XCTAssertEqual(plan.filesForUpload["queue/alpha.json"], "local")
         XCTAssertTrue(plan.uploadRequired)
-        XCTAssertEqual(plan.changedServerPaths, ["queue/alpha.json"])
+        XCTAssertEqual(plan.changedLocalPaths, ["queue/alpha.json"])
     }
 
-    func testSyncAcceptsServerChangesWhenLocalIsUnchanged() throws {
+    func testSyncAcceptsServerChangesWhenLocalIsUnchanged() {
         let local = [
             "queue/alpha.json": "base",
             "queue/PROJECTS.json": "order"
@@ -28,21 +28,22 @@ final class ServerSyncPlannerTests: XCTestCase {
             "queue/PROJECTS.json": "order"
         ]
 
-        let plan = try ServerSyncPlanner.makePlan(local: local, base: base, server: server)
+        let plan = ServerSyncPlanner.makePlan(local: local, base: base, server: server)
 
-        XCTAssertEqual(plan.mergedFiles["queue/alpha.json"], "server")
+        XCTAssertEqual(plan.filesForUpload["queue/alpha.json"], "base")
         XCTAssertFalse(plan.uploadRequired)
+        XCTAssertEqual(plan.changedLocalPaths, [])
     }
 
-    func testSyncDetectsConflictingFileEdits() {
+    func testSyncAllowsConflictingFileEditsToBeResolvedByServer() {
         let local = ["queue/alpha.json": "local"]
         let base = ["queue/alpha.json": "base"]
         let server = ["queue/alpha.json": "server"]
 
-        XCTAssertThrowsError(
-            try ServerSyncPlanner.makePlan(local: local, base: base, server: server)
-        ) { error in
-            XCTAssertEqual(error as? SyncPlannerError, .conflicts(["queue/alpha.json"]))
-        }
+        let plan = ServerSyncPlanner.makePlan(local: local, base: base, server: server)
+
+        XCTAssertTrue(plan.uploadRequired)
+        XCTAssertEqual(plan.filesForUpload, local)
+        XCTAssertEqual(plan.changedLocalPaths, ["queue/alpha.json"])
     }
 }

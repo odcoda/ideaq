@@ -1,10 +1,12 @@
 import copy
 import json
+import os
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
 
+import web.app as web_app_module
 from web.app import create_app
 
 
@@ -86,6 +88,8 @@ class AppEndpointTests(unittest.TestCase):
 
     def setUp(self):
         self.tempdir = tempfile.TemporaryDirectory()
+        self.original_state_root = os.environ.get("IDEAQ_WEB_STATE_ROOT")
+        os.environ["IDEAQ_WEB_STATE_ROOT"] = str(Path(self.tempdir.name) / "web-state")
         self.repo_dir = Path(self.tempdir.name) / "repo"
         self.queue_dir = self.repo_dir / "queue"
         self.completed_dir = self.repo_dir / "completed"
@@ -99,6 +103,10 @@ class AppEndpointTests(unittest.TestCase):
         self.client = self.app.test_client()
 
     def tearDown(self):
+        if self.original_state_root is None:
+            os.environ.pop("IDEAQ_WEB_STATE_ROOT", None)
+        else:
+            os.environ["IDEAQ_WEB_STATE_ROOT"] = self.original_state_root
         self.tempdir.cleanup()
 
     def test_create_app_uses_configured_data_root(self):
@@ -312,6 +320,56 @@ class AppEndpointTests(unittest.TestCase):
             self._git("rev-parse", "HEAD").stdout.strip(),
             self._git("--git-dir", str(remote_dir), "rev-parse", "refs/heads/main").stdout.strip(),
         )
+
+    def test_sync_endpoint_merges_local_and_server_files(self):
+        original_request_json = web_app_module.request_json
+        calls = []
+
+        def fake_request_json(method, url, token="", payload=None):
+            calls.append((method, url, token, payload))
+            server_file = json.dumps([
+                {
+                    "name": "server_idea",
+                    "human_idea": "server",
+                    "description": "",
+                    "difficulty": "S",
+                    "related": [],
+                    "priority": "none",
+                }
+            ], indent=2) + "\n"
+            if method == "GET":
+                return {
+                    "revision": "server-revision",
+                    "files": {"queue/server.json": server_file},
+                }
+            merged_files = dict(payload["files"])
+            merged_files["queue/server.json"] = server_file
+            return {
+                "revision": "merged-revision",
+                "files": merged_files,
+            }
+
+        web_app_module.request_json = fake_request_json
+        try:
+            response = self.client.post(
+                "/api/sync",
+                json={
+                    "server_url": "https://sync.example",
+                    "store_id": "default",
+                    "token": "secret",
+                },
+            )
+        finally:
+            web_app_module.request_json = original_request_json
+
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["revision"], "merged-revision")
+        self.assertEqual(data["uploaded_count"], 4)
+        self.assertTrue((self.queue_dir / "server.json").exists())
+        self.assertIn("queue/alpha.json", calls[1][3]["files"])
+        self.assertIn("client_base_files", calls[1][3])
 
 
 if __name__ == "__main__":

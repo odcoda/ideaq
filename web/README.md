@@ -7,7 +7,7 @@ Single-page Flask app for managing idea queues. Reads/writes JSON files under a 
 ```
 cd ~/projects/ideaq
 python3 -m venv .venv
-.venv/bin/python -m pip install flask
+.venv/bin/python -m pip install -r requirements.txt
 .venv/bin/python web/app.py --data-root /path/to/idea-data
 ```
 
@@ -65,5 +65,10 @@ The tests build a temporary repo fixture with `queue/` and `completed/` data and
 
 ### Saving to git
 - **commit & push** button in the toolbar commits all changes and pushes to origin from the configured data root, if that data root is a git checkout
+
+### Server sync
+- **sync setup** prompts for the server URL, store ID, and bearer token, then saves them in browser `localStorage`
+- **sync** flushes any pending delete, fetches the server snapshot, uploads local changes with the last synced local base snapshot, and replaces local JSON files with the server's canonical merged snapshot
+- Sync base snapshots are stored under `~/.local/state/ideaq/` by default, not in the queue data repo
 
 All changes save immediately to `queue/*.json`. Completed ideas go to `completed/*.json`.

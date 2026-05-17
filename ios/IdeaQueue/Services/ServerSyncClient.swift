@@ -28,7 +28,8 @@ protocol ServerSyncClient {
         configuration: SyncConfiguration,
         token: String,
         baseRevision: String,
-        files: [String: String]
+        files: [String: String],
+        clientBaseFiles: [String: String]
     ) async throws -> ServerSnapshot
 }
 
@@ -54,13 +55,18 @@ final class HTTPServerSyncClient: ServerSyncClient {
         configuration: SyncConfiguration,
         token: String,
         baseRevision: String,
-        files: [String: String]
+        files: [String: String],
+        clientBaseFiles: [String: String]
     ) async throws -> ServerSnapshot {
         var request = URLRequest(url: try snapshotURL(configuration: configuration))
         request.httpMethod = "PUT"
         setHeaders(on: &request, token: token)
 
-        let body = UploadRequest(baseRevision: baseRevision, files: files)
+        let body = UploadRequest(
+            baseRevision: baseRevision,
+            files: files,
+            clientBaseFiles: clientBaseFiles
+        )
         request.httpBody = try JSONEncoder().encode(body)
 
         let (data, response) = try await session.data(for: request)
@@ -110,10 +116,12 @@ final class HTTPServerSyncClient: ServerSyncClient {
 private struct UploadRequest: Encodable {
     let baseRevision: String
     let files: [String: String]
+    let clientBaseFiles: [String: String]
 
     enum CodingKeys: String, CodingKey {
         case baseRevision = "base_revision"
         case files
+        case clientBaseFiles = "client_base_files"
     }
 }
 

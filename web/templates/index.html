@@ -70,7 +70,7 @@ tr.row-none { background:transparent; }
 #undo-toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#333; color:#fff; padding:8px 16px; border-radius:6px; font-size:12px; display:none; z-index:200; }
 #undo-toast a { color:#8bf; cursor:pointer; margin-left:8px; text-decoration:underline; }
 /* push status */
-#push-status { font-size:12px; margin-left:4px; }
+#push-status, #sync-status { font-size:12px; margin-left:4px; }
 </style>
 </head>
 <body>
@@ -78,6 +78,9 @@ tr.row-none { background:transparent; }
 <div id="toolbar">
   <button class="btn btn-push" onclick="gitCommitPush()">commit &amp; push</button>
   <span id="push-status"></span>
+  <button class="btn" onclick="configureSync()">sync setup</button>
+  <button class="btn" onclick="syncNow()">sync</button>
+  <span id="sync-status"></span>
   <button class="btn" onclick="addProject()">+ project</button>
   <button class="btn" onclick="sortAllByPriority()">sort all by priority</button>
   <button class="btn" onclick="collapseAll()">collapse all</button>
@@ -101,6 +104,7 @@ let FILTERS = {high:true, medium:true, low:true, none:true};
 let COLLAPSED = {};
 let UNDO_STACK = [];
 let UNDO_TIMER = null;
+const SYNC_CONFIG_KEY = 'ideaq.syncConfig.v1';
 
 function api(url, body) {
   return fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
@@ -136,6 +140,65 @@ function gitCommitPush() {
     setTimeout(() => { st.textContent = ''; }, 4000);
   }).catch(() => {
     st.textContent = 'error';
+    st.style.color = '#dc2626';
+  });
+}
+
+function loadSyncConfig() {
+  try {
+    return JSON.parse(localStorage.getItem(SYNC_CONFIG_KEY) || '{}');
+  } catch {
+    return {};
+  }
+}
+
+function saveSyncConfig(config) {
+  localStorage.setItem(SYNC_CONFIG_KEY, JSON.stringify(config));
+}
+
+function configureSync() {
+  const current = loadSyncConfig();
+  const server_url = prompt('Server URL:', current.server_url || '');
+  if (server_url === null) return null;
+  const store_id = prompt('Store ID:', current.store_id || 'default');
+  if (store_id === null) return null;
+  const token = prompt('Bearer token:', current.token || '');
+  if (token === null) return null;
+
+  const config = {
+    server_url: server_url.trim(),
+    store_id: (store_id.trim() || 'default'),
+    token: token.trim(),
+  };
+  saveSyncConfig(config);
+  return config;
+}
+
+function syncNow() {
+  flushDeletes();
+  let config = loadSyncConfig();
+  if (!config.server_url || !config.store_id) {
+    config = configureSync();
+    if (!config) return;
+  }
+
+  const st = document.getElementById('sync-status');
+  st.textContent = 'syncing...';
+  st.style.color = '#666';
+  api('/api/sync', config).then(r=>r.json()).then(d => {
+    if (d.ok) {
+      STATE = d.projects;
+      PROJECT_ORDER = d.project_order;
+      st.textContent = `synced ${d.files_count} files, uploaded ${d.uploaded_count}`;
+      st.style.color = '#16a34a';
+      render();
+    } else {
+      st.textContent = d.error || 'sync failed';
+      st.style.color = '#dc2626';
+    }
+    setTimeout(() => { st.textContent = ''; }, 5000);
+  }).catch(() => {
+    st.textContent = 'sync error';
     st.style.color = '#dc2626';
   });
 }

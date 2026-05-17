@@ -7,10 +7,28 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import os
 import subprocess
+import sys
 from pathlib import Path
+from urllib.error import HTTPError, URLError
+from urllib.parse import quote
+from urllib.request import Request, urlopen
+
 from flask import Flask, current_app, jsonify, render_template, request
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from server.sync_core import (  # noqa: E402
+    TRACKED_DIRECTORIES,
+    InvalidPathError,
+    normalize_files,
+    validate_snapshot_path,
+)
 
 
 DEFAULT_DATA_ROOT = Path.cwd()
@@ -49,6 +67,15 @@ def write_project_order(order):
     write_json_file(get_project_order_file(), order)
 
 
+def ordered_project_names(projects):
+    order = read_project_order()
+    known = set(order)
+    for project_name in sorted(projects.keys()):
+        if project_name not in known:
+            order.append(project_name)
+    return order
+
+
 def read_all():
     """Return {project_name: [ideas]} for every .json in queue/."""
     projects = {}
@@ -80,6 +107,133 @@ def rename_in_related(projects, old_name, new_name):
     return changed
 
 
+def get_web_state_dir():
+    data_root_key = hashlib.sha256(str(get_data_root()).encode("utf-8")).hexdigest()[:16]
+    state_root = Path(
+        os.environ.get("IDEAQ_WEB_STATE_ROOT", Path.home() / ".local" / "state" / "ideaq")
+    )
+    return state_root / data_root_key
+
+
+def load_tracked_files(root):
+    files = {}
+    for directory_name in TRACKED_DIRECTORIES:
+        directory = Path(root) / directory_name
+        if not directory.exists():
+            continue
+        for path in sorted(directory.rglob("*.json")):
+            relative_path = path.relative_to(root).as_posix()
+            validate_snapshot_path(relative_path)
+            files[relative_path] = path.read_text(encoding="utf-8")
+    return normalize_files(files)
+
+
+def replace_tracked_files(root, files):
+    files = normalize_files(files)
+    root = Path(root)
+    existing = load_tracked_files(root)
+    for relative_path in sorted(set(existing).difference(files)):
+        path = root / relative_path
+        if path.exists():
+            path.unlink()
+
+    for relative_path, contents in files.items():
+        path = root / relative_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(contents, encoding="utf-8")
+
+
+def load_base_tracked_files():
+    base_dir = get_web_state_dir() / "base"
+    if not base_dir.exists():
+        return {}
+    return load_tracked_files(base_dir)
+
+
+def replace_base_tracked_files(files):
+    base_dir = get_web_state_dir() / "base"
+    base_dir.mkdir(parents=True, exist_ok=True)
+    replace_tracked_files(base_dir, files)
+
+
+def snapshot_url(server_url, store_id):
+    cleaned_url = str(server_url).strip().rstrip("/")
+    cleaned_store = str(store_id).strip()
+    if not cleaned_url or not cleaned_store:
+        raise ValueError("server URL and store ID are required")
+    return f"{cleaned_url}/v1/stores/{quote(cleaned_store, safe='')}/snapshot"
+
+
+def request_json(method, url, token="", payload=None):
+    headers = {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "User-Agent": "IdeaQueue-Web",
+    }
+    cleaned_token = str(token).strip()
+    if cleaned_token:
+        headers["Authorization"] = f"Bearer {cleaned_token}"
+
+    body = None
+    if payload is not None:
+        body = json.dumps(payload).encode("utf-8")
+
+    req = Request(url, data=body, headers=headers, method=method)
+    try:
+        with urlopen(req, timeout=20) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        try:
+            data = json.loads(exc.read().decode("utf-8"))
+            message = data.get("error") or data.get("message") or exc.reason
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            message = exc.reason
+        raise RuntimeError(f"sync server error: {message}") from exc
+    except URLError as exc:
+        raise RuntimeError(f"could not reach sync server: {exc.reason}") from exc
+
+
+def sync_with_server(config):
+    url = snapshot_url(config.get("server_url", ""), config.get("store_id", ""))
+    token = config.get("token", "")
+    local_files = load_tracked_files(get_data_root())
+    base_files = load_base_tracked_files()
+    server_snapshot = request_json("GET", url, token)
+    server_files = normalize_files(server_snapshot.get("files", {}))
+    changed_local_paths = sorted(
+        path
+        for path in set(local_files) | set(base_files)
+        if local_files.get(path) != base_files.get(path)
+    )
+
+    if changed_local_paths:
+        final_snapshot = request_json(
+            "PUT",
+            url,
+            token,
+            {
+                "base_revision": server_snapshot["revision"],
+                "files": local_files,
+                "client_base_files": base_files,
+            },
+        )
+    else:
+        final_snapshot = server_snapshot
+
+    final_files = normalize_files(final_snapshot.get("files", {}))
+    replace_tracked_files(get_data_root(), final_files)
+    replace_base_tracked_files(final_files)
+    projects = read_all()
+    return {
+        "ok": True,
+        "revision": final_snapshot["revision"],
+        "files_count": len(final_files),
+        "uploaded_count": len(changed_local_paths),
+        "projects": projects,
+        "project_order": ordered_project_names(projects),
+    }
+
+
 def create_app(data_root: str | Path | None = None):
     app = Flask(__name__)
 
@@ -104,12 +258,7 @@ def create_app(data_root: str | Path | None = None):
     @app.route("/")
     def index():
         projects = read_all()
-        order = read_project_order()
-        # ensure order includes all projects, append any new ones
-        known = set(order)
-        for project_name in sorted(projects.keys()):
-            if project_name not in known:
-                order.append(project_name)
+        order = ordered_project_names(projects)
         return render_template("index.html", projects=projects, project_order=order)
 
     @app.route("/api/projects", methods=["GET"])
@@ -274,6 +423,14 @@ def create_app(data_root: str | Path | None = None):
             return jsonify(ok=True, message="Committed and pushed")
         except subprocess.CalledProcessError as exc:
             return jsonify(ok=False, error=exc.stderr or str(exc)), 500
+
+    @app.route("/api/sync", methods=["POST"])
+    def api_sync():
+        data = request.get_json(force=True)
+        try:
+            return jsonify(sync_with_server(data))
+        except (InvalidPathError, ValueError, RuntimeError, KeyError) as exc:
+            return jsonify(ok=False, error=str(exc)), 400
 
     return app
 

@@ -237,7 +237,7 @@ final class DashboardStore: ObservableObject {
                 configuration: syncConfiguration,
                 token: serverToken
             )
-            let plan = try ServerSyncPlanner.makePlan(
+            let plan = ServerSyncPlanner.makePlan(
                 local: localFiles,
                 base: baseFiles,
                 server: serverSnapshot.files
@@ -249,12 +249,13 @@ final class DashboardStore: ObservableObject {
                     configuration: syncConfiguration,
                     token: serverToken,
                     baseRevision: serverSnapshot.revision,
-                    files: plan.mergedFiles
+                    files: plan.filesForUpload,
+                    clientBaseFiles: baseFiles
                 )
             } else {
                 finalSnapshot = ServerSnapshot(
                     revision: serverSnapshot.revision,
-                    files: plan.mergedFiles
+                    files: serverSnapshot.files
                 )
             }
 
@@ -269,7 +270,7 @@ final class DashboardStore: ObservableObject {
             try repository.saveSyncMetadata(syncMetadata)
             document = try repository.loadDocument()
             document.normalizeProjectOrder()
-            syncStatusMessage = syncMessage(uploaded: plan.changedServerPaths.count, total: finalSnapshot.files.count)
+            syncStatusMessage = syncMessage(uploaded: plan.changedLocalPaths.count, total: finalSnapshot.files.count)
         } catch {
             syncStatusMessage = "\(error.localizedDescription) Local edits remain saved on this device."
         }
