@@ -60,6 +60,19 @@ PUT /v1/stores/{storeID}/snapshot
 
 Server sync is optional. Configure the server URL, store ID, and optional bearer token in the sync sheet.
 
+## Installing on a personal iPhone
+
+For installs that last longer than the free 7-day Personal Team window, use a paid Apple Developer Program membership.
+
+1. Enroll in the Apple Developer Program with the Apple Account you use in Xcode.
+2. In Xcode, open Settings > Accounts and add that Apple Account.
+3. Open the `IdeaQueue` target, go to Signing & Capabilities, enable automatic signing, and select your paid team.
+4. Keep the bundle ID unique in your developer account. The current ID is `com.odcoda.ideaq.ideaqueue`.
+5. Connect the iPhone, trust the computer, and enable Developer Mode on the phone if iOS prompts for it.
+6. Select the iPhone as the run destination and press Run. If Xcode asks to register the device, allow it.
+
+Do not commit account-local signing materials. Certificates and private keys belong in Keychain, and generated profiles, archives, and exported IPAs are ignored by the repository.
+
 ## Regenerating the project
 
 The project is generated from `project.yml`:

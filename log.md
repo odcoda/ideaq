@@ -1,5 +1,13 @@
 # ideaq Log
 
+## 2026-05-17 iOS app icon
+
+Generated and installed a full iOS AppIcon asset catalog for IdeaQueue.
+Added signing/export artifact ignores and documented personal iPhone install steps.
+
+Up next:
+- set the paid Apple Developer team in Xcode when installing on a device
+
 ## 2026-05-17 uv server setup
 
 Switched Python setup docs from manual venv/requirements to `uv run` with project dependencies in `pyproject.toml`.

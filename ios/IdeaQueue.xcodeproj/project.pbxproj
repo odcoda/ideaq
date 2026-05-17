@@ -13,6 +13,7 @@
 		43120BF0FFC69B27DBCCB229 /* ServerSyncPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D6C238E5413E09026FC3D80 /* ServerSyncPlanner.swift */; };
 		45E0E153CE13631E6D55353A /* DashboardStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76594D37655A3C4C0A13A677 /* DashboardStore.swift */; };
 		48BEDFE9ABEA85A648C9B76F /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCBFF71880FED190187DF563 /* DashboardView.swift */; };
+		60D2A6405B0DD3C4A79E2E85 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9C264D245BE2FC8A146D97CE /* Assets.xcassets */; };
 		6965D8EEFE7BA43C239C9215 /* Idea.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54CFD58A1AE34AEC662D640D /* Idea.swift */; };
 		6ED5AC239315BB16AF080489 /* IdeaQueueApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A33FD2075A4650317BDD0496 /* IdeaQueueApp.swift */; };
 		9A3E06C61E8466EB80F5D054 /* LocalRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47BF333D3253CC9BCDF932EF /* LocalRepository.swift */; };
@@ -46,6 +47,7 @@
 		6CFFC0020823E52B223AA558 /* ServerCredentialStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerCredentialStore.swift; sourceTree = "<group>"; };
 		76594D37655A3C4C0A13A677 /* DashboardStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardStore.swift; sourceTree = "<group>"; };
 		7D6C238E5413E09026FC3D80 /* ServerSyncPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerSyncPlanner.swift; sourceTree = "<group>"; };
+		9C264D245BE2FC8A146D97CE /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A33FD2075A4650317BDD0496 /* IdeaQueueApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdeaQueueApp.swift; sourceTree = "<group>"; };
 		D4B806BA45005EF64D027B62 /* DashboardDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardDocument.swift; sourceTree = "<group>"; };
 		E111EEB9BA8E3E3E42952F84 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -89,6 +91,7 @@
 		3D68592A852B0FF622470644 /* IdeaQueue */ = {
 			isa = PBXGroup;
 			children = (
+				9C264D245BE2FC8A146D97CE /* Assets.xcassets */,
 				A33FD2075A4650317BDD0496 /* IdeaQueueApp.swift */,
 				E111EEB9BA8E3E3E42952F84 /* Info.plist */,
 				28B2726C5A9CF4A5D6D123A2 /* Models */,
@@ -151,6 +154,7 @@
 			buildConfigurationList = 44DC5F79E78732FBBD1E0A83 /* Build configuration list for PBXNativeTarget "IdeaQueue" */;
 			buildPhases = (
 				07E9AED27155CC2413BADAA6 /* Sources */,
+				CF2A035593292F93A55093C7 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -193,6 +197,17 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		CF2A035593292F93A55093C7 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				60D2A6405B0DD3C4A79E2E85 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		07E9AED27155CC2413BADAA6 /* Sources */ = {
@@ -268,6 +283,7 @@
 		D0B39866E3732EEB12453259 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ENABLE_TESTABILITY = YES;
 				INFOPLIST_FILE = IdeaQueue/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -280,6 +296,7 @@
 		D7701F4D21E63434E0844E55 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ENABLE_TESTABILITY = YES;
 				INFOPLIST_FILE = IdeaQueue/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;

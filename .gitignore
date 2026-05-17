@@ -11,6 +11,12 @@ web/venv/
 # Xcode user/local state
 DerivedData/
 build/
+*.ipa
+*.xcarchive
+*.mobileprovision
+*.provisionprofile
+*.cer
+*.p12
 *.xcuserstate
 xcuserdata/
 ios/IdeaQueue.xcodeproj/project.xcworkspace/xcuserdata/
