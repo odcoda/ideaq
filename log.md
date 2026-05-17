@@ -1,5 +1,16 @@
 # ideaq Log
 
+## 2026-05-17 iOS table usability
+
+Made the iOS queue table denser and less edit-heavy:
+- portrait shows name, human, and priority; landscape adds description and size
+- human/description cells truncate with tap popovers for full text
+- main table editing is limited to size and priority menus
+- row handles can be dragged to reorder ideas within or across projects
+
+Up next:
+- smoke test drag behavior on a physical device
+
 ## 2026-05-17 sync server working
 
 Added a Flask/SQLite sync server with bearer-token auth, snapshot revisions, and server-side JSON merge.

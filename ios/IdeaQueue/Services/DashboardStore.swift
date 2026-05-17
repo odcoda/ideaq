@@ -165,13 +165,27 @@ final class DashboardStore: ObservableObject {
 
     func moveIdea(project: String, index: Int, to destinationProject: String) {
         let toIndex = document.queueProjects[destinationProject]?.count ?? 0
+        moveIdea(fromProject: project, fromIndex: index, toProject: destinationProject, toIndex: toIndex)
+    }
+
+    func moveIdea(fromProject: String, fromIndex: Int, toProject: String, toIndex: Int) {
         document.moveIdea(
-            fromProject: project,
-            fromIndex: index,
-            toProject: destinationProject,
+            fromProject: fromProject,
+            fromIndex: fromIndex,
+            toProject: toProject,
             toIndex: toIndex
         )
+        collapsedProjects.remove(toProject)
         persistDocument()
+    }
+
+    func updateSize(project: String, index: Int, value: String) {
+        document.updateTextField(project: project, index: index, field: .difficulty, value: value)
+        persistDocument()
+    }
+
+    func ideaCount(in project: String) -> Int {
+        document.queueProjects[project]?.count ?? 0
     }
 
     func completeIdea(project: String, index: Int) {

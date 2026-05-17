@@ -57,11 +57,12 @@ struct DashboardView: View {
                 actionButton("sort all") {
                     store.sortAllByPriority()
                 }
-                actionButton("collapse all") {
-                    store.collapseAll()
-                }
-                actionButton("expand all") {
-                    store.expandAll()
+                actionButton(collapseToggleTitle) {
+                    if allProjectsCollapsed {
+                        store.expandAll()
+                    } else {
+                        store.collapseAll()
+                    }
                 }
             }
             .font(.system(size: 12, design: .monospaced))
@@ -89,25 +90,43 @@ struct DashboardView: View {
 
     @ViewBuilder
     private var content: some View {
-        if store.orderedProjects.isEmpty {
-            Spacer()
-            VStack(spacing: 10) {
-                Text("No local queue files yet.")
-                Text("Use sync to fetch server data or start by adding a project.")
-                    .foregroundStyle(.secondary)
-            }
-            .font(.system(size: 13, design: .monospaced))
-            Spacer()
-        } else {
-            ScrollView {
-                LazyVStack(spacing: 12) {
-                    ForEach(store.orderedProjects, id: \.self) { project in
-                        ProjectSectionView(store: store, project: project)
-                    }
+        GeometryReader { proxy in
+            if store.orderedProjects.isEmpty {
+                VStack(spacing: 10) {
+                    Spacer()
+                    Text("No local queue files yet.")
+                    Text("Use sync to fetch server data or start by adding a project.")
+                        .foregroundStyle(.secondary)
+                    Spacer()
                 }
-                .padding(.bottom, 48)
+                .font(.system(size: 13, design: .monospaced))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                let isLandscape = proxy.size.width > proxy.size.height
+
+                ScrollView {
+                    LazyVStack(spacing: 12) {
+                        ForEach(store.orderedProjects, id: \.self) { project in
+                            ProjectSectionView(
+                                store: store,
+                                project: project,
+                                isLandscape: isLandscape
+                            )
+                        }
+                    }
+                    .padding(.bottom, 48)
+                }
             }
         }
+    }
+
+    private var allProjectsCollapsed: Bool {
+        let projects = store.orderedProjects
+        return !projects.isEmpty && projects.allSatisfy { store.collapsedProjects.contains($0) }
+    }
+
+    private var collapseToggleTitle: String {
+        allProjectsCollapsed ? "expand all" : "collapse all"
     }
 
     private func actionButton(_ title: String, action: @escaping () -> Void) -> some View {

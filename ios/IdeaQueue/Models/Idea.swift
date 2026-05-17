@@ -53,3 +53,9 @@ enum PriorityOption: String, CaseIterable, Codable {
         }
     }
 }
+
+enum SizeOption: String, CaseIterable, Codable {
+    case small = "S"
+    case medium = "M"
+    case large = "L"
+}
