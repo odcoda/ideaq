@@ -1,5 +1,12 @@
 # ideaq Log
 
+## 2026-05-17 uv server setup
+
+Switched Python setup docs from manual venv/requirements to `uv run` with project dependencies in `pyproject.toml`.
+Trimmed server deployment notes to AWS-only.
+Up next:
+- deploy on EC2 and configure the clients with the server URL/token
+
 ## 2026-05-17 iOS table usability
 
 Made the iOS queue table denser and less edit-heavy:

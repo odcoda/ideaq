@@ -6,9 +6,7 @@ Single-page Flask app for managing idea queues. Reads/writes JSON files under a 
 
 ```
 cd ~/projects/ideaq
-python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt
-.venv/bin/python web/app.py --data-root /path/to/idea-data
+uv run python web/app.py --data-root /path/to/idea-data
 ```
 
 Open http://localhost:5050
@@ -23,7 +21,7 @@ The data root must contain the backing JSON directories:
 
 ```
 cd ~/projects/ideaq
-.venv/bin/python -m unittest discover -s web/tests -t .
+uv run python -m unittest discover -s web/tests -t .
 ```
 
 The tests build a temporary repo fixture with `queue/` and `completed/` data and verify the JSON files after each backend endpoint call.

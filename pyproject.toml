@@ -1,0 +1,10 @@
+[project]
+name = "ideaq"
+version = "0.1.0"
+description = "Project-management tooling for local idea queues."
+requires-python = ">=3.10"
+dependencies = [
+    "flask",
+    "gunicorn",
+]
+

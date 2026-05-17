@@ -58,11 +58,9 @@ Content-Type: application/json
 
 ```sh
 cd /Users/odile/projects/ideaq
-python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt
-export IDEAQ_SYNC_TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
+export IDEAQ_SYNC_TOKEN="$(uv run python -c 'import secrets; print(secrets.token_urlsafe(32))')"
 export IDEAQ_SERVER_DB=/tmp/ideaq-sync.sqlite3
-.venv/bin/python server/app.py --host 127.0.0.1 --port 8050 --no-debug
+uv run python server/app.py --host 127.0.0.1 --port 8050 --no-debug
 ```
 
 Test it:
@@ -94,14 +92,15 @@ Install the app:
 
 ```sh
 sudo apt update
-sudo apt install -y git python3-venv caddy sqlite3
+sudo apt install -y git curl caddy sqlite3
+curl -LsSf https://astral.sh/uv/install.sh | sh
+sudo install -m 755 ~/.local/bin/uv /usr/local/bin/uv
+sudo install -m 755 ~/.local/bin/uvx /usr/local/bin/uvx
 git clone https://github.com/odcoda/ideaq.git ~/ideaq
 cd ~/ideaq
-python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt
 sudo mkdir -p /var/lib/ideaq
 sudo chown ubuntu:ubuntu /var/lib/ideaq
-python3 -c 'import secrets; print(secrets.token_urlsafe(32))' > ~/ideaq-sync-token.txt
+uv run python -c 'import secrets; print(secrets.token_urlsafe(32))' > ~/ideaq-sync-token.txt
 chmod 600 ~/ideaq-sync-token.txt
 ```
 
@@ -119,7 +118,7 @@ User=ubuntu
 WorkingDirectory=/home/ubuntu/ideaq
 Environment=IDEAQ_SERVER_DB=/var/lib/ideaq/ideaq-sync.sqlite3
 Environment=IDEAQ_SYNC_TOKEN=$TOKEN
-ExecStart=/home/ubuntu/ideaq/.venv/bin/gunicorn -w 1 -b 127.0.0.1:8050 'server.app:create_app()'
+ExecStart=/usr/local/bin/uv run --project /home/ubuntu/ideaq --frozen gunicorn -w 1 -b 127.0.0.1:8050 'server.app:create_app()'
 Restart=always
 RestartSec=5
 
@@ -170,19 +169,8 @@ sqlite3 /var/lib/ideaq/ideaq-sync.sqlite3 \
 
 To restore, stop the service and copy the backup over `/var/lib/ideaq/ideaq-sync.sqlite3`.
 
-## Alternatives
-
-- AWS EC2: best fit for this implementation because a tiny VM plus SQLite is simple and persistent. AWS Free Tier details changed for new accounts after 2025-07-15, so watch credits and budgets.
-- A cheap VPS: often simpler than AWS if free is not required. You get one server, one monthly bill, SSH, and persistent disk.
-- Render: has free web services, but free service filesystems are ephemeral; SQLite data can disappear on restart/redeploy. Free Postgres exists but expires after 30 days, so it is not a good long-term match without changing the storage backend.
-- Fly.io: operationally nice for small apps with volumes, but their docs currently say there is no free account/free tier, only trials/allowances.
-- Heroku: no longer has free dynos or free Postgres.
-
 Official docs checked for the notes above:
 
 - [AWS Free Tier](https://aws.amazon.com/free/)
 - [AWS EC2 launch docs](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/LaunchingAndUsingInstances.html)
-- [Render free instances](https://render.com/docs/free)
-- [Fly.io cost management](https://fly.io/docs/about/cost-management/)
-- [Heroku free resource deprecation](https://devcenter.heroku.com/changelog-items/2461)
-
+- [uv installation](https://docs.astral.sh/uv/getting-started/installation/)
