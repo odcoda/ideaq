@@ -58,7 +58,7 @@ PUT /v1/stores/{storeID}/snapshot
 2. Pick an iPhone simulator or device.
 3. Run the `IdeaQueue` scheme.
 
-Server sync is optional. Configure the server URL, store ID, and optional bearer token in the sync sheet.
+Server sync is optional. Configure the server URL, store ID, and optional bearer token in the sync sheet. To enter a generated token once on a physical iPhone, copy it on a Mac using the same Apple Account with Handoff enabled, then tap `Paste` in the sync sheet; Universal Clipboard sends it to the phone. The eye button reveals the pasted token temporarily for verification.
 
 ## Installing on a personal iPhone
 

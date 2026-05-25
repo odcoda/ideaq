@@ -3,6 +3,7 @@ import SwiftUI
 struct SyncSheet: View {
     @ObservedObject var store: DashboardStore
     @Environment(\.dismiss) private var dismiss
+    @State private var isTokenVisible = false
 
     var body: some View {
         NavigationStack {
@@ -15,9 +16,7 @@ struct SyncSheet: View {
                     TextField("Store ID", text: $store.syncConfiguration.storeID)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
-                    SecureField("Bearer token", text: $store.serverToken)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
+                    bearerTokenEditor
                 }
 
                 Section("Sync") {
@@ -73,6 +72,41 @@ struct SyncSheet: View {
                                 .fill(Color(uiColor: .systemBackground))
                         )
                 }
+            }
+        }
+    }
+
+    private var bearerTokenEditor: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Group {
+                    if isTokenVisible {
+                        TextField("Bearer token", text: $store.serverToken)
+                    } else {
+                        SecureField("Bearer token", text: $store.serverToken)
+                    }
+                }
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+
+                Button {
+                    isTokenVisible.toggle()
+                } label: {
+                    Image(systemName: isTokenVisible ? "eye.slash" : "eye")
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(isTokenVisible ? "Hide bearer token" : "Show bearer token")
+            }
+
+            HStack(spacing: 10) {
+                PasteButton(payloadType: String.self) { strings in
+                    guard let token = strings.first else { return }
+                    store.serverToken = token.trimmingCharacters(in: .whitespacesAndNewlines)
+                }
+
+                Text("Copy on your Mac, then paste here.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
     }

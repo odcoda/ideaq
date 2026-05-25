@@ -1,5 +1,12 @@
 # ideaq Log
 
+## 2026-05-25 iOS token entry
+
+Added paste and reveal controls to the iOS bearer-token field so a server token can be copied from a Mac through Universal Clipboard instead of typed manually.
+
+Up next:
+- deploy the server and test a real web/iOS sync round trip
+
 ## 2026-05-17 iOS app icon
 
 Generated and installed a full iOS AppIcon asset catalog for IdeaQueue.
