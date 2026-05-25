@@ -1,5 +1,11 @@
 # ideaq Log
 
+## 2026-05-25 architecture walkthrough
+
+Traced the sync server and iOS app data flows for a code-review overview.
+Flagged JSON validation/error handling, rename conflict behavior, and snapshot retention as areas to review next.
+Server tests passed; iOS simulator tests were blocked by insufficient simulator storage.
+
 ## 2026-05-25 iOS token entry
 
 Added paste and reveal controls to the iOS bearer-token field so a server token can be copied from a Mac through Universal Clipboard instead of typed manually.
