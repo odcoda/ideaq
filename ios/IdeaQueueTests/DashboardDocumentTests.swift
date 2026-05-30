@@ -54,3 +54,21 @@ final class DashboardDocumentTests: XCTestCase {
         XCTAssertEqual(document.completedProjects["alpha"], [Idea.default])
     }
 }
+
+final class LocalRepositoryTests: XCTestCase {
+    func testLoadTrackedFilesHandlesFilesystemAliasInEnumeratedURLs() throws {
+        let fileManager = FileManager.default
+        let root = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? fileManager.removeItem(at: root) }
+
+        let repository = LocalRepository(rootURL: root, fileManager: fileManager)
+        try repository.ensureDirectories()
+        try "[]\n".write(
+            to: root.appendingPathComponent("queue/PROJECTS.json"),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        XCTAssertEqual(try repository.loadTrackedFiles(), ["queue/PROJECTS.json": "[]\n"])
+    }
+}

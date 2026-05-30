@@ -1,5 +1,11 @@
 # ideaq Log
 
+## 2026-05-30 iOS sync snapshot paths
+
+Fixed iOS snapshot path generation when `/var/...` files are enumerated as `/private/var/...`.
+- canonicalize filesystem aliases before deriving relative upload paths
+- keep the server rejection of absolute snapshot paths covered by a regression test
+
 ## 2026-05-25 architecture walkthrough
 
 Traced the sync server and iOS app data flows for a code-review overview.

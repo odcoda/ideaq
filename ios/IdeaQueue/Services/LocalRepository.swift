@@ -126,11 +126,20 @@ struct LocalRepository {
             let enumerator = fileManager.enumerator(at: directory, includingPropertiesForKeys: nil)
             while let entry = enumerator?.nextObject() as? URL {
                 guard entry.pathExtension == "json" else { continue }
-                let relativePath = entry.path.replacingOccurrences(of: root.path + "/", with: "")
+                let relativePath = try relativeTrackedPath(for: entry, under: root)
                 files[relativePath] = try String(contentsOf: entry, encoding: .utf8)
             }
         }
         return files
+    }
+
+    private func relativeTrackedPath(for entry: URL, under root: URL) throws -> String {
+        let rootComponents = root.resolvingSymlinksInPath().pathComponents
+        let entryComponents = entry.resolvingSymlinksInPath().pathComponents
+        guard entryComponents.starts(with: rootComponents), entryComponents.count > rootComponents.count else {
+            throw CocoaError(.fileReadInvalidFileName)
+        }
+        return entryComponents.dropFirst(rootComponents.count).joined(separator: "/")
     }
 
     private func replaceTrackedFiles(at root: URL, files: [String: String]) throws {

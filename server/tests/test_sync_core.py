@@ -75,6 +75,10 @@ class SyncCoreMergeTests(unittest.TestCase):
         with self.assertRaises(InvalidPathError):
             normalize_files({"notes.txt": "nope"})
 
+    def test_normalize_rejects_absolute_paths(self):
+        with self.assertRaises(InvalidPathError):
+            normalize_files({"/privatequeue/PROJECTS.json": "[]\n"})
+
     def test_normalize_rejects_parent_directory_paths(self):
         with self.assertRaises(InvalidPathError):
             normalize_files({"queue/../completed/alpha.json": "[]\n"})
