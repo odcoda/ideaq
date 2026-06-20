@@ -1,5 +1,11 @@
 # ideaq Log
 
+## 2026-06-20 web project GOALS workflow
+Added a per-idea web button that creates a project repo from the selected idea or appends that idea to an existing `GOALS.md`.
+- checks `~/projects/<project>` status on page load for create/append icons
+- publishes new project repos through local `gh` without storing credentials in app code
+- adds green row feedback while the workflow runs
+
 ## 2026-05-30 iOS sync snapshot paths
 
 Fixed iOS snapshot path generation when `/var/...` files are enumerated as `/private/var/...`.

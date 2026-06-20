@@ -53,9 +53,14 @@ The tests build a temporary repo fixture with `queue/` and `completed/` data and
 - Order is persisted in `queue/PROJECTS.json`
 
 ### Completing and deleting ideas
-- Each row has three icons in the left column: ☰ (drag), ✓ (complete), ✗ (delete)
+- Each row has four icons in the left column: ☰ (drag), ⊕/§ (project GOALS workflow), ✓ (complete), ✗ (delete)
 - **✓ Complete** moves the idea from `queue/` to `completed/` (parallel JSON files)
 - **✗ Delete** removes the idea with a 6-second **undo** toast at the bottom of the screen
+
+### Project GOALS workflow
+- **⊕** means `~/projects/<project>` does not exist yet; clicking it creates the directory, writes a `GOALS.md` section for only that selected idea, initializes a git repo, and publishes a new public GitHub repo with `gh`
+- **§** means the project directory already exists; clicking it appends a new `GOALS.md` section for only that selected idea
+- The dashboard reads project directory status on page load and updates the icon after creating a project repo
 
 ### Adding new items
 - **+ idea** adds a blank idea to that project

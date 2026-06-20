@@ -89,7 +89,10 @@ class AppEndpointTests(unittest.TestCase):
     def setUp(self):
         self.tempdir = tempfile.TemporaryDirectory()
         self.original_state_root = os.environ.get("IDEAQ_WEB_STATE_ROOT")
+        self.original_projects_root = os.environ.get("IDEAQ_PROJECTS_ROOT")
         os.environ["IDEAQ_WEB_STATE_ROOT"] = str(Path(self.tempdir.name) / "web-state")
+        self.projects_root = Path(self.tempdir.name) / "projects"
+        os.environ["IDEAQ_PROJECTS_ROOT"] = str(self.projects_root)
         self.repo_dir = Path(self.tempdir.name) / "repo"
         self.queue_dir = self.repo_dir / "queue"
         self.completed_dir = self.repo_dir / "completed"
@@ -107,6 +110,10 @@ class AppEndpointTests(unittest.TestCase):
             os.environ.pop("IDEAQ_WEB_STATE_ROOT", None)
         else:
             os.environ["IDEAQ_WEB_STATE_ROOT"] = self.original_state_root
+        if self.original_projects_root is None:
+            os.environ.pop("IDEAQ_PROJECTS_ROOT", None)
+        else:
+            os.environ["IDEAQ_PROJECTS_ROOT"] = self.original_projects_root
         self.tempdir.cleanup()
 
     def test_create_app_uses_configured_data_root(self):
@@ -243,6 +250,64 @@ class AppEndpointTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), {"ok": True})
         self.assertEqual(self._queue_project("beta")[-1], DEFAULT_NEW_IDEA)
+
+    def test_project_repo_status_reports_existing_project_directories(self):
+        (self.projects_root / "beta").mkdir(parents=True)
+
+        response = self.client.get("/api/project_repo_status")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.get_json(),
+            {"alpha": False, "beta": True},
+        )
+
+    def test_push_idea_appends_selected_idea_to_existing_project_goals(self):
+        project_dir = self.projects_root / "alpha"
+        project_dir.mkdir(parents=True)
+        (project_dir / "GOALS.md").write_text("# alpha\n\nExisting notes.\n", encoding="utf-8")
+
+        response = self.client.post(
+            "/api/push_idea_to_project",
+            json={"project": "alpha", "index": 1},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), {"ok": True, "action": "appended", "exists": True})
+        goals = (project_dir / "GOALS.md").read_text(encoding="utf-8")
+        self.assertIn("## alpha_two", goals)
+        self.assertIn("Alpha idea two", goals)
+        self.assertIn("Second alpha idea.", goals)
+        self.assertNotIn("alpha_one", goals)
+        self.assertNotIn("Beta idea", goals)
+
+    def test_push_idea_creates_project_goals_and_publishes_new_public_repo(self):
+        calls = []
+        original_publish = web_app_module.commit_and_push_new_public_repo
+
+        def fake_publish(repo_path, repo_name):
+            calls.append((Path(repo_path), repo_name))
+
+        web_app_module.commit_and_push_new_public_repo = fake_publish
+        try:
+            response = self.client.post(
+                "/api/push_idea_to_project",
+                json={"project": "beta", "index": 0},
+            )
+        finally:
+            web_app_module.commit_and_push_new_public_repo = original_publish
+
+        project_dir = self.projects_root.resolve() / "beta"
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), {"ok": True, "action": "created", "exists": True})
+        self.assertEqual(calls, [(project_dir, "beta")])
+        goals = (project_dir / "GOALS.md").read_text(encoding="utf-8")
+        self.assertIn("# beta", goals)
+        self.assertIn("## beta_shared", goals)
+        self.assertIn("Beta idea shared", goals)
+        self.assertIn("Shared beta idea.", goals)
+        self.assertNotIn("beta_other", goals)
+        self.assertNotIn("Alpha idea", goals)
 
     def test_project_order_writes_projects_file(self):
         response = self.client.post("/api/project_order", json=["alpha", "beta"])

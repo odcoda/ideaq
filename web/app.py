@@ -10,6 +10,8 @@ import argparse
 import hashlib
 import json
 import os
+import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -32,6 +34,7 @@ from server.sync_core import (  # noqa: E402
 
 
 DEFAULT_DATA_ROOT = Path.cwd()
+PROJECT_REPO_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 
 
 def get_data_root():
@@ -48,6 +51,10 @@ def get_completed_dir():
 
 def get_project_order_file():
     return Path(current_app.config["PROJECTS_ORDER_FILE"])
+
+
+def get_projects_root():
+    return Path(current_app.config["PROJECTS_ROOT"])
 
 
 def write_json_file(path, data, *, ensure_ascii=True):
@@ -93,6 +100,98 @@ def read_all():
 def write_project(name, ideas):
     path = get_queue_dir() / f"{name}.json"
     write_json_file(path, ideas, ensure_ascii=False)
+
+
+def validate_project_repo_name(name):
+    name = str(name).strip()
+    if (
+        not name
+        or name in {".", ".."}
+        or "/" in name
+        or "\\" in name
+        or not PROJECT_REPO_NAME_RE.fullmatch(name)
+    ):
+        raise ValueError("invalid project name")
+    return name
+
+
+def project_repo_path(project_name):
+    return get_projects_root() / validate_project_repo_name(project_name)
+
+
+def project_repo_status(projects):
+    status = {}
+    for project_name in projects:
+        try:
+            status[project_name] = project_repo_path(project_name).is_dir()
+        except ValueError:
+            status[project_name] = False
+    return status
+
+
+def selected_idea_goals_section(idea):
+    idea_name = " ".join(str(idea.get("name") or "untitled").split()) or "untitled"
+    human_idea = str(idea.get("human_idea") or "").strip()
+    description = str(idea.get("description") or "").strip()
+
+    lines = [f"## {idea_name}", ""]
+    if human_idea:
+        lines.extend([human_idea, ""])
+    if description and description != human_idea:
+        lines.extend([description, ""])
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def write_new_project_goals(repo_path, project_name, idea):
+    goals = f"# {project_name}\n\n{selected_idea_goals_section(idea)}"
+    (repo_path / "GOALS.md").write_text(goals, encoding="utf-8")
+
+
+def append_project_goals_section(repo_path, idea):
+    goals_path = repo_path / "GOALS.md"
+    section = selected_idea_goals_section(idea)
+    try:
+        existing = goals_path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        existing = ""
+
+    prefix = existing.rstrip()
+    contents = f"{prefix}\n\n{section}" if prefix else section
+    goals_path.write_text(contents, encoding="utf-8")
+
+
+def run_checked(args, cwd):
+    return subprocess.run(
+        args,
+        cwd=cwd,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+
+def commit_and_push_new_public_repo(repo_path, repo_name):
+    if shutil.which("gh") is None:
+        raise RuntimeError("gh CLI not found")
+
+    run_checked(["git", "init", "-b", "main"], cwd=repo_path)
+    run_checked(["git", "add", "GOALS.md"], cwd=repo_path)
+    run_checked(["git", "commit", "-m", "Initial goals"], cwd=repo_path)
+    run_checked(
+        [
+            "gh",
+            "repo",
+            "create",
+            repo_name,
+            "--public",
+            "--source",
+            ".",
+            "--remote",
+            "origin",
+            "--push",
+        ],
+        cwd=repo_path,
+    )
 
 
 def rename_in_related(projects, old_name, new_name):
@@ -250,6 +349,11 @@ def create_app(data_root: str | Path | None = None):
         QUEUE_DIR=queue_dir,
         COMPLETED_DIR=completed_dir,
         PROJECTS_ORDER_FILE=queue_dir / "PROJECTS.json",
+        PROJECTS_ROOT=Path(
+            os.environ.get("IDEAQ_PROJECTS_ROOT", Path.home() / "projects")
+        )
+        .expanduser()
+        .resolve(),
     )
 
     queue_dir.mkdir(parents=True, exist_ok=True)
@@ -259,11 +363,20 @@ def create_app(data_root: str | Path | None = None):
     def index():
         projects = read_all()
         order = ordered_project_names(projects)
-        return render_template("index.html", projects=projects, project_order=order)
+        return render_template(
+            "index.html",
+            projects=projects,
+            project_order=order,
+            project_repo_status=project_repo_status(projects),
+        )
 
     @app.route("/api/projects", methods=["GET"])
     def api_projects():
         return jsonify(read_all())
+
+    @app.route("/api/project_repo_status", methods=["GET"])
+    def api_project_repo_status():
+        return jsonify(project_repo_status(read_all()))
 
     @app.route("/api/save", methods=["POST"])
     def api_save():
@@ -322,9 +435,10 @@ def create_app(data_root: str | Path | None = None):
     @app.route("/api/new_project", methods=["POST"])
     def api_new_project():
         data = request.get_json(force=True)
-        name = data["name"].strip()
-        if not name:
-            return jsonify(ok=False, error="empty name"), 400
+        try:
+            name = validate_project_repo_name(data["name"])
+        except (KeyError, ValueError) as exc:
+            return jsonify(ok=False, error=str(exc)), 400
         write_project(name, [])
         return jsonify(ok=True)
 
@@ -385,6 +499,39 @@ def create_app(data_root: str | Path | None = None):
         projects[proj].pop(idx)
         write_project(proj, projects[proj])
         return jsonify(ok=True)
+
+    @app.route("/api/push_idea_to_project", methods=["POST"])
+    def api_push_idea_to_project():
+        """Create or update ~/projects/<project>/GOALS.md for one selected idea."""
+        data = request.get_json(force=True)
+        try:
+            proj = validate_project_repo_name(data["project"])
+            idx = int(data["index"])
+            projects = read_all()
+            idea = projects[proj][idx]
+            if isinstance(data.get("idea"), dict):
+                idea = data["idea"]
+
+            repo_path = project_repo_path(proj)
+            get_projects_root().mkdir(parents=True, exist_ok=True)
+
+            if repo_path.exists():
+                if not repo_path.is_dir():
+                    return jsonify(ok=False, error="project path exists but is not a directory"), 409
+                append_project_goals_section(repo_path, idea)
+                return jsonify(ok=True, action="appended", exists=True)
+
+            repo_path.mkdir()
+            write_new_project_goals(repo_path, proj, idea)
+            commit_and_push_new_public_repo(repo_path, proj)
+            return jsonify(ok=True, action="created", exists=True)
+        except (KeyError, IndexError, ValueError) as exc:
+            return jsonify(ok=False, error=str(exc)), 400
+        except RuntimeError as exc:
+            return jsonify(ok=False, error=str(exc)), 500
+        except subprocess.CalledProcessError as exc:
+            message = (exc.stderr or exc.stdout or str(exc)).strip()
+            return jsonify(ok=False, error=message), 500
 
     @app.route("/api/git_commit_push", methods=["POST"])
     def api_git_commit_push():

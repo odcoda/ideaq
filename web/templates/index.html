@@ -21,20 +21,25 @@ table { width:100%; border-collapse:collapse; table-layout:fixed; }
 th,td { border:1px solid var(--border); padding:3px 5px; vertical-align:top; text-align:left; overflow:hidden; }
 th { background:var(--hdr); font-weight:600; font-size:12px; white-space:nowrap; }
 /* column widths */
-col.c-ctrl { width:28px; }
+col.c-ctrl { width:42px; }
 col.c-name { width:11%; }
 col.c-human { width:30%; }
 col.c-desc { width:auto; }
 col.c-diff { width:48px; }
 col.c-related { width:13%; }
 col.c-pri { width:72px; }
-td.ctrl-cell { text-align:center; color:#999; user-select:none; padding:0; vertical-align:middle; }
-.ctrl-inner { display:flex; flex-direction:column; align-items:center; gap:1px; }
-.ctrl-icon { cursor:pointer; font-size:13px; line-height:1.2; width:100%; }
+td.ctrl-cell { text-align:center; color:#999; user-select:none; padding:1px; vertical-align:middle; }
+.ctrl-inner { display:grid; grid-template-columns:repeat(2,18px); grid-auto-rows:16px; justify-content:center; align-content:center; gap:1px; }
+.ctrl-icon { cursor:pointer; font-size:13px; line-height:1; width:18px; height:16px; display:flex; align-items:center; justify-content:center; border-radius:2px; }
+.ctrl-icon.ctrl-button { border:0; background:transparent; color:inherit; font:inherit; padding:0; }
+.ctrl-icon.ctrl-button:disabled { cursor:wait; opacity:0.55; }
 .ctrl-icon:hover { color:var(--fg); }
 .ctrl-icon.drag-handle { cursor:grab; }
 .ctrl-icon.complete-btn:hover { color:#16a34a; }
 .ctrl-icon.delete-btn:hover { color:#dc2626; }
+.ctrl-icon.project-workflow-create { color:#2563eb; }
+.ctrl-icon.project-workflow-append { color:#0f766e; }
+.ctrl-icon.project-workflow-create:hover, .ctrl-icon.project-workflow-append:hover { color:#fff; background:#2563eb; }
 td[contenteditable="true"] { cursor:text; }
 td[contenteditable="true"]:focus { outline:2px solid #6b8afd; background:#fff; }
 select.pri { font:inherit; font-size:12px; border:none; background:transparent; width:100%; }
@@ -45,6 +50,17 @@ tr.row-high { background:#ede9fe; }
 tr.row-medium { background:#e0f2fe; }
 tr.row-low { background:#fef9c3; }
 tr.row-none { background:transparent; }
+@keyframes project-push-shine {
+  from { background-position:160% 0; }
+  to { background-position:-60% 0; }
+}
+tr.project-push-working > td {
+  background:linear-gradient(90deg,#dcfce7 0%,#86efac 35%,#f0fdf4 70%,#dcfce7 100%);
+  background-size:220% 100%;
+  animation:project-push-shine .8s linear infinite;
+}
+tr.project-push-done > td { background:#dcfce7; box-shadow:inset 3px 0 #16a34a; }
+tr.project-push-error > td { background:#fee2e2; box-shadow:inset 3px 0 #dc2626; }
 /* priority text colors */
 .pri-high { color:#7c3aed; font-weight:600; }
 .pri-medium { color:#0284c7; }
@@ -100,6 +116,7 @@ tr.row-none { background:transparent; }
 const PRIO_ORDER = {high:0,medium:1,low:2,none:3};
 let STATE = {{ projects | tojson }};
 let PROJECT_ORDER = {{ project_order | tojson }};
+let PROJECT_REPO_STATUS = {{ project_repo_status | tojson }};
 let FILTERS = {high:true, medium:true, low:true, none:true};
 let COLLAPSED = {};
 let UNDO_STACK = [];
@@ -257,9 +274,14 @@ function ideaRow(proj, idea, i) {
   const pri = idea.priority||'none';
   const pc = 'pri-'+pri;
   const rc = 'row-'+pri;
+  const repoExists = !!PROJECT_REPO_STATUS[proj];
+  const projectWorkflowClass = repoExists ? 'project-workflow-append' : 'project-workflow-create';
+  const projectWorkflowIcon = repoExists ? '&#x00A7;' : '&#x2295;';
+  const projectWorkflowTitle = repoExists ? 'Append this idea to GOALS.md' : 'Create project repo from this idea';
   return `<tr class="${rc}" data-proj="${esc(proj)}" data-idx="${i}">
     <td class="ctrl-cell"><div class="ctrl-inner">
       <span class="ctrl-icon drag-handle" oncontextmenu="showCtxMenu(event,'${esc(proj)}',${i})">&#x2630;</span>
+      <button type="button" class="ctrl-icon ctrl-button ${projectWorkflowClass}" title="${projectWorkflowTitle}" onclick="pushIdeaToProject('${esc(proj)}',${i},event)">${projectWorkflowIcon}</button>
       <span class="ctrl-icon complete-btn" title="Mark complete" onclick="completeIdea('${esc(proj)}',${i})">&#x2713;</span>
       <span class="ctrl-icon delete-btn" title="Delete" onclick="deleteIdea('${esc(proj)}',${i})">&#x2717;</span>
     </div></td>
@@ -334,10 +356,62 @@ function addProject() {
   const n = name.trim().replace(/[^a-z0-9_-]/gi,'_').toLowerCase();
   if (STATE[n]) { alert('Already exists'); return; }
   STATE[n] = [];
+  PROJECT_REPO_STATUS[n] = false;
   PROJECT_ORDER.push(n);
   api('/api/new_project', {name:n});
   api('/api/project_order', PROJECT_ORDER);
   render();
+}
+
+function ideaPayload(proj, idx) {
+  const idea = STATE[proj][idx] || {};
+  return {
+    name: idea.name || '',
+    human_idea: idea.human_idea || '',
+    description: idea.description || '',
+  };
+}
+
+function findIdeaRow(proj, idx) {
+  return Array.from(document.querySelectorAll(`tr[data-idx="${idx}"]`))
+    .find(tr => tr.dataset.proj === proj);
+}
+
+function markIdeaRow(proj, idx, className, duration) {
+  const row = findIdeaRow(proj, idx);
+  if (!row) return;
+  row.classList.add(className);
+  if (duration) {
+    setTimeout(() => row.classList.remove(className), duration);
+  }
+}
+
+function pushIdeaToProject(proj, idx, event) {
+  event.stopPropagation();
+  flushDeletes();
+  const btn = event.currentTarget;
+  const row = btn.closest('tr');
+  btn.disabled = true;
+  row.classList.remove('project-push-done', 'project-push-error');
+  row.classList.add('project-push-working');
+
+  api('/api/push_idea_to_project', {project:proj, index:idx, idea:ideaPayload(proj, idx)})
+    .then(async response => {
+      const data = await response.json();
+      if (!response.ok || !data.ok) {
+        throw new Error(data.error || 'project workflow failed');
+      }
+      PROJECT_REPO_STATUS[proj] = true;
+      render();
+      markIdeaRow(proj, idx, 'project-push-done', 1400);
+    })
+    .catch(err => {
+      row.classList.remove('project-push-working');
+      row.classList.add('project-push-error');
+      btn.disabled = false;
+      setTimeout(() => row.classList.remove('project-push-error'), 2200);
+      alert(err.message || 'project workflow failed');
+    });
 }
 
 function completeIdea(proj, idx) {
