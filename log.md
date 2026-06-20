@@ -12,6 +12,9 @@ Made per-idea row action controls larger and stacked in one vertical column.
 ## 2026-06-20 web row action columns
 Returned per-idea row action controls to a two-column layout while keeping the larger button sizing.
 
+## 2026-06-20 web row action highlights
+Added persistent green/red highlights to complete and delete row controls to reduce accidental clicks.
+
 ## 2026-05-30 iOS sync snapshot paths
 
 Fixed iOS snapshot path generation when `/var/...` files are enumerated as `/private/var/...`.
