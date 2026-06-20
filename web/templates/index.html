@@ -21,17 +21,17 @@ table { width:100%; border-collapse:collapse; table-layout:fixed; }
 th,td { border:1px solid var(--border); padding:3px 5px; vertical-align:top; text-align:left; overflow:hidden; }
 th { background:var(--hdr); font-weight:600; font-size:12px; white-space:nowrap; }
 /* column widths */
-col.c-ctrl { width:42px; }
+col.c-ctrl { width:38px; }
 col.c-name { width:11%; }
 col.c-human { width:30%; }
 col.c-desc { width:auto; }
 col.c-diff { width:48px; }
 col.c-related { width:13%; }
 col.c-pri { width:72px; }
-td.ctrl-cell { text-align:center; color:#999; user-select:none; padding:1px; vertical-align:middle; }
-.ctrl-inner { display:grid; grid-template-columns:repeat(2,18px); grid-auto-rows:16px; justify-content:center; align-content:center; gap:1px; }
-.ctrl-icon { cursor:pointer; font-size:13px; line-height:1; width:18px; height:16px; display:flex; align-items:center; justify-content:center; border-radius:2px; }
-.ctrl-icon.ctrl-button { border:0; background:transparent; color:inherit; font:inherit; padding:0; }
+td.ctrl-cell { text-align:center; color:#999; user-select:none; padding:2px; vertical-align:middle; }
+.ctrl-inner { display:grid; grid-template-columns:27px; grid-auto-rows:24px; justify-content:center; align-content:center; gap:3px; }
+.ctrl-icon { cursor:pointer; font-size:18px; line-height:1; width:27px; height:24px; display:flex; align-items:center; justify-content:center; border-radius:3px; }
+.ctrl-icon.ctrl-button { border:0; background:transparent; color:inherit; font-family:inherit; padding:0; }
 .ctrl-icon.ctrl-button:disabled { cursor:wait; opacity:0.55; }
 .ctrl-icon:hover { color:var(--fg); }
 .ctrl-icon.drag-handle { cursor:grab; }

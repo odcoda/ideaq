@@ -6,6 +6,9 @@ Added a per-idea web button that creates a project repo from the selected idea o
 - publishes new project repos through local `gh` without storing credentials in app code
 - adds green row feedback while the workflow runs
 
+## 2026-06-20 web row action sizing
+Made per-idea row action controls larger and stacked in one vertical column.
+
 ## 2026-05-30 iOS sync snapshot paths
 
 Fixed iOS snapshot path generation when `/var/...` files are enumerated as `/private/var/...`.
