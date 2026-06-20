@@ -15,6 +15,9 @@ Returned per-idea row action controls to a two-column layout while keeping the l
 ## 2026-06-20 web row action highlights
 Added persistent green/red highlights to complete and delete row controls to reduce accidental clicks.
 
+## 2026-06-20 web row action color set
+Added matching grey and blue highlights to the drag and project workflow row controls.
+
 ## 2026-05-30 iOS sync snapshot paths
 
 Fixed iOS snapshot path generation when `/var/...` files are enumerated as `/private/var/...`.
